@@ -182,4 +182,63 @@ def validate_references(zip_path: str) -> Result:
                 check_path(f"content_scripts[{idx}].css", css_path)
     else:
         findings["warnings"].append("content_scripts is not a list.")
+
+    # devtools_page
+    devtools_page = manifest.get("devtools_page")
+    if devtools_page is not None:
+        if isinstance(devtools_page, str):
+            check_path("devtools_page", devtools_page)
+        else:
+            findings["warnings"].append(
+                f"devtools_page is not a string: {devtools_page!r}."
+            )
+
+    # side_panel.default_path
+    side_panel = manifest.get("side_panel") or {}
+    default_path = side_panel.get("default_path")
+    if default_path is not None:
+        if isinstance(default_path, str):
+            check_path("side_panel.default_path", default_path)
+        else:
+            findings["warnings"].append(
+                f"side_panel.default_path is not a string: {default_path!r}."
+            )
+
+    # chrome_url_overrides values
+    chrome_overrides = manifest.get("chrome_url_overrides") or {}
+    for key, path in chrome_overrides.items():
+        if isinstance(path, str):
+            check_path(f"chrome_url_overrides[{key}]", path)
+        else:
+            findings["warnings"].append(
+                f"chrome_url_overrides[{key}] is not a string: {path!r}."
+            )
+
+    # declarative_net_request.rule_resources[].path
+    dnr = manifest.get("declarative_net_request") or {}
+    rule_resources = dnr.get("rule_resources") or []
+    for idx, rr in enumerate(rule_resources):
+        if isinstance(rr, dict):
+            path = rr.get("path")
+            if path:
+                check_path(f"declarative_net_request.rule_resources[{idx}].path", path)
+            else:
+                findings["warnings"].append(
+                    f"declarative_net_request.rule_resources[{idx}] missing path"
+                )
+        else:
+            findings["warnings"].append(
+                f"declarative_net_request.rule_resources[{idx}] is not a dict"
+            )
+
+    # sandbox.pages
+    sandbox = manifest.get("sandbox") or {}
+    pages = sandbox.get("pages") or []
+    for idx, page_path in enumerate(pages):
+        if isinstance(page_path, str):
+            check_path(f"sandbox.pages[{idx}]", page_path)
+        else:
+            findings["warnings"].append(
+                f"sandbox.pages[{idx}] is not a string: {page_path!r}."
+            )
     return findings

@@ -114,6 +114,77 @@ class TestReferenceValidator(unittest.TestCase):
         self.assertTrue(validate_manifest(str(zip_path))["errors"])
         os.remove(zip_path)
 
+    # New reference tests
+    def test_devtools_page(self):
+        zip_path = _create_zip({
+            "manifest.json": b'{"manifest_version":3,"devtools_page":"devtools.html"}',
+            "devtools.html": b"",
+        })
+        res = validate_references(str(zip_path))
+        self.assertFalse(res["errors"])
+        os.remove(zip_path)
+
+        zip_path = _create_zip({"manifest.json": b'{"manifest_version":3,"devtools_page":"devtools.html"}'})
+        res = validate_references(str(zip_path))
+        self.assertTrue(any("missing file" in e for e in res["errors"]))
+        os.remove(zip_path)
+
+    def test_side_panel_default_path(self):
+        zip_path = _create_zip({
+            "manifest.json": b'{"manifest_version":3,"side_panel":{"default_path":"panel.html"}}',
+            "panel.html": b"",
+        })
+        res = validate_references(str(zip_path))
+        self.assertFalse(res["errors"])
+        os.remove(zip_path)
+
+        zip_path = _create_zip({"manifest.json": b'{"manifest_version":3,"side_panel":{"default_path":"panel.html"}}'})
+        res = validate_references(str(zip_path))
+        self.assertTrue(any("missing file" in e for e in res["errors"]))
+        os.remove(zip_path)
+
+    def test_chrome_url_overrides(self):
+        zip_path = _create_zip({
+            "manifest.json": b'{"manifest_version":3,"chrome_url_overrides":{"newtab":"override.html"}}',
+            "override.html": b"",
+        })
+        res = validate_references(str(zip_path))
+        self.assertFalse(res["errors"])
+        os.remove(zip_path)
+
+        zip_path = _create_zip({"manifest.json": b'{"manifest_version":3,"chrome_url_overrides":{"newtab":"override.html"}}'})
+        res = validate_references(str(zip_path))
+        self.assertTrue(any("missing file" in e for e in res["errors"]))
+        os.remove(zip_path)
+
+    def test_declarative_net_request_rule_resources(self):
+        zip_path = _create_zip({
+            "manifest.json": b'{"manifest_version":3,"declarative_net_request":{"rule_resources":[{"path":"rules.json"}]}}',
+            "rules.json": b"",
+        })
+        res = validate_references(str(zip_path))
+        self.assertFalse(res["errors"])
+        os.remove(zip_path)
+
+        zip_path = _create_zip({"manifest.json": b'{"manifest_version":3,"declarative_net_request":{"rule_resources":[{"path":"rules.json"}]}}'})
+        res = validate_references(str(zip_path))
+        self.assertTrue(any("missing file" in e for e in res["errors"]))
+        os.remove(zip_path)
+
+    def test_sandbox_pages(self):
+        zip_path = _create_zip({
+            "manifest.json": b'{"manifest_version":3,"sandbox":{"pages":["sandbox.html"]}}',
+            "sandbox.html": b"",
+        })
+        res = validate_references(str(zip_path))
+        self.assertFalse(res["errors"])
+        os.remove(zip_path)
+
+        zip_path = _create_zip({"manifest.json": b'{"manifest_version":3,"sandbox":{"pages":["sandbox.html"]}}'})
+        res = validate_references(str(zip_path))
+        self.assertTrue(any("missing file" in e for e in res["errors"]))
+        os.remove(zip_path)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,4 +6,4 @@ intentionally small so that future phases (manifest validation, GUI,
 reporting, etc.) can depend on a stable foundation.
 """
 
-__all__ = ["zip_inspector", "manifest_validator"]
+__all__ = ["zip_inspector", "manifest_validator", "locale_validator"]

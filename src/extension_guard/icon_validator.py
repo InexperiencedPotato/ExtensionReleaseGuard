@@ -86,14 +86,21 @@ def _signature_png(data: bytes) -> Tuple[bool, List[str]]:
     """
 
     msgs: List[str] = []
-    if len(data) < 24:
+    if len(data) < 12:
         return False, ["PNG icon truncated or too small."]
     if data[:8] != b"\x89PNG\r\n\x1a\n":
         return False, ["PNG icon missing PNG signature."]
-    # IHDR starts at byte 16.
-    if data[12:16] != b"IHDR":
+    # IHDR chunk should start at offset 12; ensure we have enough data.
+    if len(data) < 16 or data[12:16] != b"IHDR":
         return False, ["PNG icon missing IHDR chunk."]
+    if len(data) < 24:
+        return False, ["PNG icon truncated or too small."]
     width = int.from_bytes(data[16:20], "big")
+    height = int.from_bytes(data[20:24], "big")
+    if width == 0 or height == 0:
+        return False, ["PNG icon has zero dimension."]
+    if width != height:
+        msgs.append(f"PNG icon non‑square dimensions {width}x{height}.")
     height = int.from_bytes(data[20:24], "big")
     if width == 0 or height == 0:
         return False, ["PNG icon has zero dimension."]
@@ -108,6 +115,48 @@ def _signature_jpg(data: bytes) -> Tuple[bool, List[str]]:
     if not (data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9")):
         return False, ["JPEG icon missing start/end markers."]
     return True, []
+
+
+def _signature_jpg(data: bytes) -> Tuple[bool, List[str]]:
+    """Very small JPEG signature check – start/end markers only."""
+    if len(data) < 4:
+        return False, ["JPEG icon too small."]
+    if not (data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9")):
+        return False, ["JPEG icon missing start/end markers."]
+    return True, []
+
+
+def _signature_gif(data: bytes) -> Tuple[bool, List[str]]:
+    if len(data) < 6:
+        return False, ["GIF icon too small."]
+    if data[:6] not in (b"GIF87a", b"GIF89a"):
+        return False, ["GIF icon missing GIF header."]
+    return True, []
+
+
+def _signature_bmp(data: bytes) -> Tuple[bool, List[str]]:
+    if len(data) < 2:
+        return False, ["BMP icon too small."]
+    if data[:2] != b"BM":
+        return False, ["BMP icon missing BMP signature."]
+    return True, []
+
+
+def _signature_ico(data: bytes) -> Tuple[bool, List[str]]:
+    if len(data) < 4:
+        return False, ["ICO icon too small."]
+    if data[:4] != b"\x00\x00\x01\x00":
+        return False, ["ICO icon missing ICO signature."]
+    return True, []
+
+
+SIGNATURE_CHECKS = {
+    "png": _signature_png,
+    "jpg": _signature_jpg,
+    "gif": _signature_gif,
+    "bmp": _signature_bmp,
+    "ico": _signature_ico,
+}
 
 
 def _signature_gif(data: bytes) -> Tuple[bool, List[str]]:

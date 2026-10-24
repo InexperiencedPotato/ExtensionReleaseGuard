@@ -241,4 +241,60 @@ def validate_references(zip_path: str) -> Result:
             findings["warnings"].append(
                 f"sandbox.pages[{idx}] is not a string: {page_path!r}."
             )
+
+    # web_accessible_resources
+    web_accessible = manifest.get("web_accessible_resources")
+    if web_accessible is not None:
+        if not isinstance(web_accessible, list):
+            findings["warnings"].append(
+                f"web_accessible_resources is not a list: {web_accessible!r}."
+            )
+        else:
+            for idx, entry in enumerate(web_accessible):
+                if not isinstance(entry, dict):
+                    findings["warnings"].append(
+                        f"web_accessible_resources[{idx}] is not a dict: {entry!r}."
+                    )
+                    continue
+                resources = entry.get("resources")
+                if not isinstance(resources, list):
+                    findings["warnings"].append(
+                        f"web_accessible_resources[{idx}].resources is not a list: {resources!r}."
+                    )
+                    continue
+                for res in resources:
+                    if not isinstance(res, str):
+                        findings["warnings"].append(
+                            f"web_accessible_resources[{idx}].resources contains non-string: {res!r}."
+                        )
+                        continue
+                    # Reject absolute or traversal paths
+                    if res.startswith("/") or ":" in res or ".." in res.split('/'):
+                        findings["errors"].append(
+                            f"web_accessible_resources[{idx}].resources contains unsafe path: {res}."
+                        )
+                        continue
+                    # Wildcard handling
+                    if "*" in res:
+                        prefix, _, suffix = res.partition("*")
+                        matches = [p for p in entry_counts if p.startswith(prefix) and p.endswith(suffix)]
+                        if not matches:
+                            findings["warnings"].append(
+                                f"web_accessible_resources[{idx}].resources wildcard {res!r} matches no entries."
+                            )
+                        else:
+                            for p in matches:
+                                if entry_counts.get(p, 0) > 1:
+                                    findings["errors"].append(
+                                        f"web_accessible_resources[{idx}].resources wildcard {res!r} matches duplicate entry: {p}."
+                                    )
+                    # Literal (non-wildcard) - check existence
+                    elif res not in entry_counts:
+                        findings["errors"].append(
+                            f"web_accessible_resources[{idx}].resources missing file: {res}."
+                        )
+                    elif entry_counts.get(res, 0) > 1:
+                        findings["errors"].append(
+                            f"web_accessible_resources[{idx}].resources ambiguous duplicate: {res}."
+                        )
     return findings

@@ -42,23 +42,28 @@ class TestAuditOrchestrator(unittest.TestCase):
     # 2. Combined findings from multiple validators
     def test_combined_findings(self):
         entries = {
-            # Manifest missing required field "name"
+            # Manifest missing required field "name"; icons: 48 is missing
+            # from the ZIP (reference error), 128 has a bad signature (icon error)
             "manifest.json": json.dumps(
-                {"manifest_version": 3, "version": "1.0"}
+                {
+                    "manifest_version": 3,
+                    "version": "1.0",
+                    "icons": {"48": "missing.png", "128": "icon.png"},
+                }
             ).encode("utf-8"),
-            # Reference validator error – missing icon file
-            "icons.json": json.dumps({"icons": {"48": "missing.png"}}).encode("utf-8"),
             # Locale error – default_locale missing but _locales present
             "_locales/en/messages.json": json.dumps({"hello": {"message": "Hi"}}).encode("utf-8"),
-            # Icon validator error – malformed PNG signature
-            "icon.png": b"\x00\x01\x02",
+            # Icon validator error – malformed PNG signature (long enough to
+            # get past the truncation check)
+            "icon.png": b"\x00" * 16,
         }
         res = self._audit(entries)
+        diag = f"findings: {res}"
         # Expect errors from manifest, reference, locale, icon
-        self.assertTrue(any("Missing required field: name." in e for e in res["errors"]))
-        self.assertTrue(any("icon file missing: missing.png" in e for e in res["errors"]))
-        self.assertTrue(any("default_locale missing" in e for e in res["errors"]))
-        self.assertTrue(any("PNG icon missing PNG signature" in e for e in res["errors"]))
+        self.assertTrue(any("Missing required field: name." in e for e in res["errors"]), diag)
+        self.assertTrue(any("icons[48] references missing file: missing.png" in e for e in res["errors"]), diag)
+        self.assertTrue(any("Missing required field: default_locale." in e for e in res["errors"]), diag)
+        self.assertTrue(any("PNG icon missing PNG signature" in e for e in res["errors"]), diag)
         # No duplicate messages should appear
         seen = set()
         for level in ["errors", "warnings", "info"]:
@@ -97,4 +102,34 @@ class TestAuditOrchestrator(unittest.TestCase):
             ).encode("utf-8"),
         }
         res = self._audit(entries)
-        self.assertTrue(any("icon file missing" in e for e in res["errors"]))
+        self.assertTrue(any("references missing file: icon.png" in e for e in res["errors"]), res)
+
+    # 7. Missing required field does not stop downstream validators
+    def test_missing_name_still_runs_validators(self):
+        entries = {
+            "manifest.json": json.dumps(
+                {"manifest_version": 3, "version": "1.0", "icons": {"48": "icon.png"}}
+            ).encode("utf-8"),
+        }
+        res = self._audit(entries)
+        self.assertIn("Missing required field: name.", res["errors"])
+        self.assertTrue(any("references missing file: icon.png" in e for e in res["errors"]), res)
+
+    # 8. Manifest that is valid JSON but not an object
+    def test_manifest_root_array(self):
+        res = self._audit({"manifest.json": b"[]"})
+        self.assertEqual(res["errors"], ["manifest.json root must be a JSON object."])
+
+    # 9. Missing manifest is reported once
+    def test_missing_manifest_reported_once(self):
+        res = self._audit({"foo.txt": b"bar"})
+        self.assertEqual(res["errors"], ["Missing root-level manifest.json."])
+
+    # 10. Duplicate manifest key is not misattributed to messages.json
+    def test_duplicate_manifest_key(self):
+        entries = {
+            "manifest.json": b'{"manifest_version": 3, "name": "a", "name": "b", "version": "1.0"}'
+        }
+        res = self._audit(entries)
+        self.assertIn("Duplicate key in manifest.json: 'name'.", res["errors"])
+        self.assertFalse(any("messages.json" in e for e in res["errors"]), res)

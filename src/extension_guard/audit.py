@@ -79,8 +79,10 @@ def audit_extension(zip_path: str) -> Result:
     _merge_findings(overall, manifest_findings)
 
     # Determine whether the manifest file itself is present and well‑formed.
+    # File-level errors (missing, malformed, non-object, duplicate key) all
+    # name manifest.json; missing required fields do not and must not block
+    # the downstream validators.
     manifest_invalid = any(
-        msg.lower().startswith("missing") or
         "manifest.json" in msg.lower() for msg in manifest_findings["errors"]
     )
 

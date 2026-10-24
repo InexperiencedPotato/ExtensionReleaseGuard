@@ -111,12 +111,11 @@ def validate_locales(zip_path: str) -> Result:
         # Cannot continue without a valid manifest
         return findings
 
-    # Check default_locale
+    # Check default_locale (only required when _locales/ entries exist; see below)
     default_locale = manifest.get("default_locale")
-    if default_locale is None:
-        findings["errors"].append("Missing required field: default_locale.")
-        # If no default locale, but _locales present we still report missing field
-    elif not isinstance(default_locale, str) or not default_locale.strip():
+    if default_locale is not None and (
+        not isinstance(default_locale, str) or not default_locale.strip()
+    ):
         findings["errors"].append("Field 'default_locale' must be a non‑empty string.")
 
     # Gather ZIP entries
@@ -125,16 +124,15 @@ def validate_locales(zip_path: str) -> Result:
             names = zf.namelist()
             # Identify _locales/ entries
             locales_entries = [n for n in names if n.startswith("_locales/")]
-            # If _locales/ present but default_locale missing or invalid, already flagged
-            if locales_entries and (default_locale is None or not isinstance(default_locale, str) or not default_locale.strip()):
-                # No further locale checks if default_locale missing/invalid
-                pass
+            # default_locale is required only when the package ships _locales/
+            if locales_entries and default_locale is None:
+                findings["errors"].append("Missing required field: default_locale.")
             # If default_locale present and is valid string
             if isinstance(default_locale, str) and default_locale.strip():
                 locale_dir = f"_locales/{default_locale}/"
                 # Ensure locale directory exists
                 if not any(n.startswith(locale_dir) for n in names):
-                                    findings["errors"].append(f"Missing file: {locale_dir}messages.json.")
+                    findings["errors"].append(f"Missing file: {locale_dir}messages.json.")
                 else:
                     # Check messages.json existence
                     messages_path = f"{locale_dir}messages.json"

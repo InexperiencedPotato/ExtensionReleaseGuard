@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# PyTest cache
+.pytest_cache/
+
+# VS Code
+.vscode/
+
+# IDE folders
+.idea/
+
+# virtualenv
+.venv/
+env/
+
+# build artifacts
+build/
+dist/
+*.egg-info/
+
+# Other system files
+.DS_Store

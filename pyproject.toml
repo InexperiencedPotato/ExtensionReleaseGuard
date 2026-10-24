@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "extension_guard"
+version = "0.1.0"
+description = "Phase 1 of ExtensionRelease Guard – safe ZIP inspector"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [{name = "Dimitrios", email = "dimitrios@example.com"}]
+keywords = ["chrome-extension", "zip", "inspector"]
+classifiers = ["Programming Language :: Python :: 3 :: Only", "License :: OSI Approved :: MIT License"]
+dependencies = []
+
+[tool.setuptools.packages]
+find = {include = ["extension_guard"]}

@@ -5,14 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "extension_guard"
 version = "0.1.0"
-description = "Phase 1 of ExtensionRelease Guard – safe ZIP inspector"
+description = "ExtensionRelease Guard - local pre-release inspector for Chrome extension ZIPs"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
-authors = [{name = "Dimitrios", email = "dimitrios@example.com"}]
+authors = [{name = "InexperiencedPotato"}]
 keywords = ["chrome-extension", "zip", "inspector"]
 classifiers = ["Programming Language :: Python :: 3 :: Only", "License :: OSI Approved :: MIT License"]
 dependencies = []
 
+[project.optional-dependencies]
+gui = ["customtkinter==5.2.2"]
+
 [tool.setuptools.packages]
-find = {include = ["extension_guard"]}
+find = {where = ["src"], include = ["extension_guard"]}

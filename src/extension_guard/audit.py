@@ -24,7 +24,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 # Import validators – the modules expose the public functions only.
-from .zip_inspector import inspect_zip
+from .zip_inspector import inspect_zip, is_fatal
 from .manifest_validator import validate_manifest
 from .reference_validator import validate_references
 from .locale_validator import validate_locales
@@ -68,10 +68,8 @@ def audit_extension(zip_path: str) -> Result:
     zip_findings = inspect_zip(zip_path)
     _merge_findings(overall, zip_findings)
 
-    # If the ZIP itself is not a valid archive, there is no point in
-    # continuing.  The presence of any error related to ZIP handling
-    # indicates a malformed archive.
-    if any("ZIP" in e for e in zip_findings["errors"]):
+    # Stop when the archive is unusable or over a resource limit, so no validator reads its entries.
+    if is_fatal(zip_findings):
         return overall
 
     # 2. Manifest validation – required for many other checks.

@@ -223,8 +223,8 @@ def validate_icons(zip_path: str) -> Result:
         for sz, path in icons.items():
             icon_entries.append((path, f"icons[{sz}]") )
     # action.default_icon
-    action = manifest.get("action") or {}
-    default_icon = action.get("default_icon")
+    action = manifest.get("action")
+    default_icon = action.get("default_icon") if isinstance(action, dict) else None
     if isinstance(default_icon, dict):
         for sz, path in default_icon.items():
             icon_entries.append((path, f"action.default_icon[{sz}]") )
@@ -236,7 +236,7 @@ def validate_icons(zip_path: str) -> Result:
         entry_set = {info.filename for info in zf.infolist()}
         for path, decl in icon_entries:
             # Skip if entry missing – duplicate errors avoided.
-            if path not in entry_set:
+            if not isinstance(path, str) or path not in entry_set:
                 continue
             # Read bounded bytes.
             try:

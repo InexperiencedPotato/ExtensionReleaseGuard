@@ -84,6 +84,7 @@ def validate_manifest(zip_path: str) -> Dict[str, List[str]]:
         return findings
     except Exception as exc:  # pragma: no cover – defensive
         findings["errors"].append(f"Unexpected error reading manifest.json: {exc}")
+        return findings
     # Empty file check
     if not raw:
         findings["errors"].append("manifest.json is empty.")
@@ -97,7 +98,7 @@ def validate_manifest(zip_path: str) -> Dict[str, List[str]]:
     # JSON parsing with duplicate key detection
     try:
         manifest_obj = json.loads(text, object_pairs_hook=_no_duplicates_object_pairs_hook)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, RecursionError):  # RecursionError: absurdly deep nesting
         findings["errors"].append("manifest.json contains malformed JSON.")
         return findings
     except ValueError as exc:  # duplicate key

@@ -67,6 +67,16 @@ def _load_manifest(zip_path: str) -> Tuple[Dict, Result]:
     return manifest_obj, findings
 
 
+def _obj(value) -> Dict:
+    """Return *value* if it is a dict, else ``{}`` (malformed types never crash)."""
+    return value if isinstance(value, dict) else {}
+
+
+def _lst(value) -> List:
+    """Return *value* if it is a list, else ``[]``."""
+    return value if isinstance(value, list) else []
+
+
 def _zip_entry_counts(zip_path: str) -> Counter:
     """Return a Counter of file names inside the ZIP."""
     with zipfile.ZipFile(zip_path, "r", allowZip64=True) as zf:
@@ -133,7 +143,7 @@ def validate_references(zip_path: str) -> Result:
         else:
             findings["warnings"].append("icons is not a dictionary.")
     # action.default_icon
-    action = manifest.get("action") or {}
+    action = _obj(manifest.get("action"))
     default_icon = action.get("default_icon")
     if default_icon is not None:
         if isinstance(default_icon, dict):
@@ -148,7 +158,7 @@ def validate_references(zip_path: str) -> Result:
     if popup is not None:
         check_path("action.default_popup", popup)
     # background.service_worker
-    background = manifest.get("background") or {}
+    background = _obj(manifest.get("background"))
     worker = background.get("service_worker")
     if worker is not None:
         check_path("background.service_worker", worker)
@@ -157,7 +167,7 @@ def validate_references(zip_path: str) -> Result:
     if opts_page is not None:
         check_path("options_page", opts_page)
     # options_ui.page
-    options_ui = manifest.get("options_ui") or {}
+    options_ui = _obj(manifest.get("options_ui"))
     page = options_ui.get("page")
     if page is not None:
         check_path("options_ui.page", page)
@@ -194,7 +204,7 @@ def validate_references(zip_path: str) -> Result:
             )
 
     # side_panel.default_path
-    side_panel = manifest.get("side_panel") or {}
+    side_panel = _obj(manifest.get("side_panel"))
     default_path = side_panel.get("default_path")
     if default_path is not None:
         if isinstance(default_path, str):
@@ -205,7 +215,7 @@ def validate_references(zip_path: str) -> Result:
             )
 
     # chrome_url_overrides values
-    chrome_overrides = manifest.get("chrome_url_overrides") or {}
+    chrome_overrides = _obj(manifest.get("chrome_url_overrides"))
     for key, path in chrome_overrides.items():
         if isinstance(path, str):
             check_path(f"chrome_url_overrides[{key}]", path)
@@ -215,8 +225,8 @@ def validate_references(zip_path: str) -> Result:
             )
 
     # declarative_net_request.rule_resources[].path
-    dnr = manifest.get("declarative_net_request") or {}
-    rule_resources = dnr.get("rule_resources") or []
+    dnr = _obj(manifest.get("declarative_net_request"))
+    rule_resources = _lst(dnr.get("rule_resources"))
     for idx, rr in enumerate(rule_resources):
         if isinstance(rr, dict):
             path = rr.get("path")
@@ -232,8 +242,8 @@ def validate_references(zip_path: str) -> Result:
             )
 
     # sandbox.pages
-    sandbox = manifest.get("sandbox") or {}
-    pages = sandbox.get("pages") or []
+    sandbox = _obj(manifest.get("sandbox"))
+    pages = _lst(sandbox.get("pages"))
     for idx, page_path in enumerate(pages):
         if isinstance(page_path, str):
             check_path(f"sandbox.pages[{idx}]", page_path)

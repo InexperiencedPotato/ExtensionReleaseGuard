@@ -4,8 +4,9 @@ import zipfile
 import json
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from src.extension_guard.locale_validator import validate_locales
+from src.extension_guard.locale_validator import MAX_MESSAGES_SIZE as MAX, validate_locales
 
 class TestLocaleValidator(unittest.TestCase):
     def _make_zip(self, entries):
@@ -101,6 +102,44 @@ class TestLocaleValidator(unittest.TestCase):
         result = self._validate(entries)
         # Expect size error message
         self.assertTrue(any("messages.json size" in err for err in result["errors"]))
+
+class TestMessagesSizeIsCheckedBeforeReading(unittest.TestCase):
+    MANIFEST = json.dumps({"manifest_version": 3, "name": "T", "version": "1.0", "default_locale": "en"}).encode()
+
+    def _zip(self, messages: bytes) -> str:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+        tmp.close()
+        self.addCleanup(os.unlink, tmp.name)
+        with zipfile.ZipFile(tmp.name, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("manifest.json", self.MANIFEST)
+            zf.writestr("_locales/en/messages.json", messages)
+        return tmp.name
+
+    def _validate_without_opening(self, messages: bytes):
+        path = self._zip(messages)
+        real_open = zipfile.ZipFile.open
+
+        def guarded(zf, name, *args, **kwargs):  # manifest.json may be read; messages.json must not be
+            self.assertNotIn("messages.json", str(getattr(name, "filename", name)), "messages.json was opened")
+            return real_open(zf, name, *args, **kwargs)
+
+        with mock.patch.object(zipfile.ZipFile, "open", guarded):
+            return validate_locales(path)
+
+    def test_oversized_declared_file_is_rejected_without_opening_it(self):
+        result = self._validate_without_opening(b"a" * (MAX + 1))
+        self.assertEqual(result["errors"], [f"messages.json size {MAX + 1} bytes exceeds limit of {MAX} bytes."])
+
+    def test_huge_compressed_file_is_rejected_cheaply(self):
+        result = self._validate_without_opening(b"a" * (64 * 1024 * 1024))
+        self.assertTrue(any("messages.json size" in e for e in result["errors"]), result)
+
+    def test_file_exactly_at_the_limit_is_still_read_and_parsed(self):
+        head = b'{"k": {"message": "'
+        body = head + b"a" * (MAX - len(head) - 3) + b'"}}'
+        self.assertEqual(len(body), MAX)
+        self.assertEqual(validate_locales(self._zip(body))["errors"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

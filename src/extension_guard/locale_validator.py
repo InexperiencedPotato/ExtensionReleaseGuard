@@ -142,11 +142,16 @@ def validate_locales(zip_path: str) -> Result:
                     elif count > 1:
                         findings["errors"].append(f"Duplicate file: {messages_path}.")
                     else:
-                        # Validate messages.json
-                        with zf.open(messages_path) as fp:
-                            data = fp.read()
-                        if len(data) > MAX_MESSAGES_SIZE:
-                            findings["errors"].append(f"messages.json size {len(data)} bytes exceeds limit of {MAX_MESSAGES_SIZE} bytes.")
+                        # Validate messages.json; the declared size is checked before anything is read
+                        declared = zf.getinfo(messages_path).file_size
+                        if declared > MAX_MESSAGES_SIZE:
+                            data = None
+                        else:
+                            with zf.open(messages_path) as fp:
+                                data = fp.read(MAX_MESSAGES_SIZE + 1)
+                        if data is None or len(data) > MAX_MESSAGES_SIZE:
+                            size = declared if data is None else len(data)
+                            findings["errors"].append(f"messages.json size {size} bytes exceeds limit of {MAX_MESSAGES_SIZE} bytes.")
                         else:
                             try:
                                 text = data.decode("utf-8")

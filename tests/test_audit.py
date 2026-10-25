@@ -6,6 +6,7 @@ import tempfile
 import zipfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from src.extension_guard.audit import audit_extension
 
@@ -17,6 +18,83 @@ def _make_zip(entries: dict) -> str:
         for path, content in entries.items():
             zf.writestr(path, content)
     return tmp.name
+
+
+class TestAuditArchiveSafety(unittest.TestCase):
+    MANIFEST_NO_VERSION = json.dumps({"manifest_version": 3, "name": "T"}).encode()  # one manifest finding
+
+    def _path(self, entries, compression=zipfile.ZIP_DEFLATED):
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+        tmp.close()
+        self.addCleanup(os.unlink, tmp.name)
+        with zipfile.ZipFile(tmp.name, "w", compression) as zf:
+            for path, content in entries.items():
+                zf.writestr(path, content)
+        return tmp.name
+
+    def _no_validator_runs(self, path):
+        from src.extension_guard import audit as audit_module
+
+        names = ("validate_manifest", "validate_references", "validate_locales", "validate_icons")
+        patches = [mock.patch.object(audit_module, n) for n in names]
+        mocks = [p.start() for p in patches]
+        for p in patches:
+            self.addCleanup(p.stop)
+        result = audit_extension(path)
+        for m in mocks:
+            m.assert_not_called()
+        return result
+
+    def test_entry_limit_stops_validators_from_reading_the_archive(self):
+        entries = {f"f{i}.txt": b"" for i in range(1001)}
+        entries["manifest.json"] = self.MANIFEST_NO_VERSION
+        result = self._no_validator_runs(self._path(entries))
+        self.assertTrue(any(e.startswith("Archive contains") for e in result["errors"]), result)
+
+    def test_size_limit_stops_validators_from_reading_the_archive(self):
+        result = self._no_validator_runs(self._path({"manifest.json": b"{}", "big.bin": b"\0" * (50 * 1024 * 1024 + 1)}))
+        self.assertTrue(any(e.startswith("Total uncompressed size") for e in result["errors"]), result)
+
+    def test_not_a_zip_and_missing_file_still_stop_early(self):
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+        tmp.write(b"not a zip")
+        tmp.close()
+        self.addCleanup(os.unlink, tmp.name)
+        self._no_validator_runs(tmp.name)
+        self._no_validator_runs(tmp.name + ".missing")
+
+    def test_zip_in_an_entry_name_cannot_suppress_manifest_findings(self):
+        result = audit_extension(self._path({"manifest.json": self.MANIFEST_NO_VERSION, "../ZIP.txt": b"x"}))
+        self.assertTrue(any("path traversal component: ../ZIP.txt" in e for e in result["errors"]), result)
+        self.assertIn("Missing required field: version.", result["errors"])
+
+    def test_encrypted_entry_does_not_hide_other_findings(self):
+        path = self._path({"manifest.json": self.MANIFEST_NO_VERSION, "a.js": b"x"}, zipfile.ZIP_STORED)
+        with open(path, "rb") as fh:
+            raw = bytearray(fh.read())
+        raw[raw.find(b"PK\x03\x04", 10) + 6] |= 1
+        raw[raw.rfind(b"PK\x01\x02") + 8] |= 1
+        with open(path, "wb") as fh:
+            fh.write(raw)
+        result = audit_extension(path)
+        self.assertTrue(any("is encrypted: a.js" in e for e in result["errors"]), result)
+        self.assertIn("Missing required field: version.", result["errors"])
+
+    def test_findings_for_hostile_names_stay_escaped_in_html_reports(self):
+        from src.extension_guard.gui_core import AuditOutcome
+        from src.extension_guard.report import build_report, to_html, to_json, to_txt
+
+        path = self._path(
+            {"manifest.json": self.MANIFEST_NO_VERSION, "<img src=x onerror=1>.js": b"1", "<IMG src=x onerror=1>.js": b"2"}
+        )
+        result = audit_extension(path)
+        self.assertTrue(any("differ only by case" in w for w in result["warnings"]), result)
+        report = build_report(AuditOutcome(result, 0.0), path)
+        page = to_html(report)
+        self.assertNotIn("<img", page.lower())
+        self.assertIn("&lt;img src=x onerror=1&gt;.js", page)
+        for text in (page, to_json(report), to_txt(report)):
+            self.assertNotIn(os.path.dirname(path), text)
 
 
 class TestAuditOrchestrator(unittest.TestCase):

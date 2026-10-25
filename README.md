@@ -156,3 +156,7 @@ not committed; releases attach it as a separate asset.
 * Drag-and-drop shows no hover highlight and does not work if the app runs
   elevated and Explorer does not. **Browse** always works.
 * The executable is unsigned.
+
+## Support
+
+If this tool saves you time, you can [support its development on Ko-fi](https://ko-fi.com/inexperiencedpotato). Donations are optional and do not affect the license.

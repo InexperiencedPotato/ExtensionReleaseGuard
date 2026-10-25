@@ -9,6 +9,8 @@ reports problems with remediation guidance, and exports a report.
 > extension is safe, and it does not guarantee Chrome Web Store compliance or
 > approval. It is not affiliated with or endorsed by Google.
 
+![ExtensionRelease Guard auditing a sample extension](docs/screenshot.png)
+
 ## Using it
 
 * **Windows executable:** download `ExtensionReleaseGuard.exe` from the
